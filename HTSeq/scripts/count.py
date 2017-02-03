@@ -16,7 +16,7 @@ def invert_strand( iv ):
    return iv2
 
 def count_reads_in_features( sam_filename, gff_filename, samtype, order, stranded, 
-      overlap_mode, feature_type, id_attribute, quiet, minaqual, samout ):
+      overlap_mode, feature_type, id_attribute, quiet, minaqual, samout, multimap ):
       
    def write_to_samout( r, assignment ):
       if samoutfile is None:
@@ -57,6 +57,8 @@ def count_reads_in_features( sam_filename, gff_filename, samtype, order, strande
                   ( f.name, f.iv ) )
             features[ f.iv ] += feature_id
             counts[ f.attr[ id_attribute ] ] = 0
+            if multimap:
+               counts[ '_' + f.attr[ id_attribute ] ] = 0
          i += 1
          if i % 100000 == 0 and not quiet:
             sys.stderr.write( "%d GFF lines processed.\n" % i )
@@ -107,6 +109,7 @@ def count_reads_in_features( sam_filename, gff_filename, samtype, order, strande
       nonunique = 0
       i = 0   
       for r in read_seq:
+         is_nonunique = False
          if i > 0 and i % 100000 == 0 and not quiet:
             sys.stderr.write( "%d SAM alignment record%s processed.\n" % ( i, "s" if not pe_mode else " pairs" ) )
 
@@ -119,8 +122,10 @@ def count_reads_in_features( sam_filename, gff_filename, samtype, order, strande
             try:
                if r.optional_field( "NH" ) > 1:
                   nonunique += 1
-                  write_to_samout( r, "__alignment_not_unique" )
-                  continue
+                  is_nonunique = True
+                  if not multimap:
+                     write_to_samout( r, "__alignment_not_unique" )
+                     continue
             except KeyError:
                pass
             if r.aQual < minaqual:
@@ -155,8 +160,10 @@ def count_reads_in_features( sam_filename, gff_filename, samtype, order, strande
                if ( r[0] is not None and r[0].optional_field( "NH" ) > 1 ) or \
                      ( r[1] is not None and r[1].optional_field( "NH" ) > 1 ):
                   nonunique += 1
-                  write_to_samout( r, "__alignment_not_unique" )
-                  continue
+                  is_nonunique = True
+                  if not multimap:
+                     write_to_samout( r, "__alignment_not_unique" )
+                     continue
             except KeyError:
                pass
             if ( r[0] and r[0].aQual < minaqual ) or ( r[1] and r[1].aQual < minaqual ):
@@ -193,7 +200,10 @@ def count_reads_in_features( sam_filename, gff_filename, samtype, order, strande
                ambiguous += 1
             else:
                write_to_samout( r, list(fs)[0] )
-               counts[ list(fs)[0] ] += 1
+               if not is_nonunique:
+                  counts[ list(fs)[0] ] += 1
+               else:
+                  counts[ '_' + list(fs)[0] ] += 1
          except UnknownChrom:
             write_to_samout( r, "__no_feature" )
             empty += 1
@@ -274,6 +284,9 @@ def main():
       "SAM file called SAMOUT, annotating each line with its feature assignment " +
       "(as an optional field with tag 'XF')" )
 
+   optParser.add_option( "--multimap", action="store_true", dest="multimap",
+      help = "count multimapped reads (but prefixed with an underscore)" )
+
    optParser.add_option( "-q", "--quiet", action="store_true", dest="quiet",
       help = "suppress progress report" ) # and warnings" )
 
@@ -292,7 +305,7 @@ def main():
    try:
       count_reads_in_features( args[0], args[1], opts.samtype, opts.order, opts.stranded, 
          opts.mode, opts.featuretype, opts.idattr, opts.quiet, opts.minaqual,
-         opts.samout )
+         opts.samout, opts.multimap )
    except:
       sys.stderr.write( "  %s\n" % str( sys.exc_info()[1] ) )
       sys.stderr.write( "  [Exception type: %s, raised in %s:%d]\n" % 
