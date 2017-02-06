@@ -121,14 +121,14 @@ def count_reads_in_features( sam_filename, gff_filename, samtype, order, strande
                continue
             try:
                if r.optional_field( "NH" ) > 1:
-                  nonunique += 1
                   is_nonunique = True
                   if not multimap:
+                     nonunique += 1
                      write_to_samout( r, "__alignment_not_unique" )
                      continue
             except KeyError:
                pass
-            if r.aQual < minaqual:
+            if not is_nonunique and r.aQual < minaqual:
                lowqual += 1
                write_to_samout( r, "__too_low_aQual" )
                continue
@@ -159,14 +159,14 @@ def count_reads_in_features( sam_filename, gff_filename, samtype, order, strande
             try:
                if ( r[0] is not None and r[0].optional_field( "NH" ) > 1 ) or \
                      ( r[1] is not None and r[1].optional_field( "NH" ) > 1 ):
-                  nonunique += 1
                   is_nonunique = True
                   if not multimap:
+                     nonunique += 1
                      write_to_samout( r, "__alignment_not_unique" )
                      continue
             except KeyError:
                pass
-            if ( r[0] and r[0].aQual < minaqual ) or ( r[1] and r[1].aQual < minaqual ):
+            if not is_nonunique and (( r[0] and r[0].aQual < minaqual ) or ( r[1] and r[1].aQual < minaqual )):
                lowqual += 1
                write_to_samout( r, "__too_low_aQual" )
                continue         
